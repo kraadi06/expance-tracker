@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusSpend — Smart College Expense & Pocket Money Tracker</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Editorial Typography Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- TOAST CONTAINER -->
+    <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+    <!-- CONFIRM MODAL -->
+    <div id="confirm-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+        <div class="modal-card">
+            <h3 id="confirm-modal-title">Confirm Action</h3>
+            <p id="confirm-modal-msg">Are you sure you want to proceed?</p>
+            <div class="modal-actions">
+                <button id="confirm-modal-cancel" class="btn btn-secondary">Cancel</button>
+                <button id="confirm-modal-ok" class="btn btn-danger">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GENERIC TRANSACTION FORM MODAL -->
+    <div id="tx-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+        <div class="modal-card modal-lg">
+            <div class="modal-header">
+                <h3 id="tx-modal-title">Add Transaction</h3>
+                <button class="btn-icon" id="close-tx-modal" aria-label="Close modal">&times;</button>
+            </div>
+            <form id="tx-form">
+                <input type="hidden" id="tx-id">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="tx-type">Transaction Type</label>
+                        <select id="tx-type" required>
+                            <option value="expense">Expense (-)</option>
+                            <option value="income">Income / Money Received (+)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="tx-amount">Amount (₹)</label>
+                        <input type="number" id="tx-amount" min="1" step="any" placeholder="e.g. 150" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="tx-category">Category</label>
+                        <select id="tx-category" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="tx-date">Date</label>
+                        <input type="date" id="tx-date" required>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="tx-payment">Payment Method</label>
+                        <select id="tx-payment" required>
+                            <option value="UPI">UPI</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Debit Card">Debit Card</option>
+                            <option value="Credit Card">Credit Card</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="tx-merchant">Merchant / Place</label>
+                        <input type="number" style="display:none;" /> <!-- Trap autocomplete -->
+                        <input type="text" id="tx-merchant" placeholder="e.g. Nescafe Canteen, Auto Stand">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="tx-note">Optional Note</label>
+                    <input type="text" id="tx-note" placeholder="e.g. Split with Rohan, Xerox for Lab">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-tx-modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Transaction</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- SAVINGS GOAL MODAL -->
+    <div id="goal-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="goal-modal-title">New Savings Goal</h3>
+                <button class="btn-icon" id="close-goal-modal" aria-label="Close modal">&times;</button>
+            </div>
+            <form id="goal-form">
+                <input type="hidden" id="goal-id">
+                <div class="form-group">
+                    <label for="goal-title">Goal Title</label>
+                    <input type="text" id="goal-title" placeholder="e.g. New Headphones, Tech Fest Ticket" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="goal-target">Target Amount (₹)</label>
+                        <input type="number" id="goal-target" min="1" step="any" placeholder="e.g. 2500" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="goal-current">Initial Saved (₹)</label>
+                        <input type="number" id="goal-current" min="0" step="any" value="0">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="goal-date">Target Date (Optional)</label>
+                    <input type="date" id="goal-date">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="cancel-goal-modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Goal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- TOP HEADER / NAV (PERSISTENT ACROSS VIEWS WHEN LOGGED IN) -->
+    <header class="navbar" id="navbar">
+        <div class="nav-container">
+            <div class="nav-brand" id="brand-logo">
+                <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                </svg>
+                <span class="brand-text">Campus<span class="brand-accent">Spend</span></span>
+            </div>
+
+            <!-- DESKTOP APP NAV (HIDDEN ON LANDING/AUTH) -->
+            <nav class="desktop-nav hidden" id="desktop-app-nav">
+                <button class="nav-link active" data-view="overview">Overview</button>
+                <button class="nav-link" data-view="expenses">Quick Log</button>
+                <button class="nav-link" data-view="transactions">Ledger</button>
+                <button class="nav-link" data-view="budgets">Budgets</button>
+                <button class="nav-link" data-view="analytics">Analytics</button>
+                <button class="nav-link" data-view="savings">Savings</button>
+                <button class="nav-link" data-view="calendar">Calendar</button>
+                <button class="nav-link" data-view="settings">Settings</button>
+            </nav>
+
+            <!-- LANDING NAV ACTIONS -->
+            <div class="nav-actions" id="landing-nav-actions">
+                <button class="btn btn-ghost" id="theme-toggle" aria-label="Toggle Theme">
+                    <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5" />
+                        <path
+                            d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                    </svg>
+                </button>
+                <button class="btn btn-secondary nav-auth-btn" id="nav-login-btn">Log In</button>
+                <button class="btn btn-primary nav-auth-btn" id="nav-signup-btn">Get Started</button>
+            </div>
+
+            <!-- LOGGED IN USER ACTIONS -->
+            <div class="nav-actions hidden" id="user-nav-actions">
+                <button class="btn btn-ghost" id="theme-toggle-app" aria-label="Toggle Theme">
+                    <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5" />
+                        <path
+                            d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                    </svg>
+                </button>
+                <div class="user-badge" id="user-profile-badge">
+                    <span id="nav-user-name">Student</span>
+                </div>
+                <button class="btn btn-secondary btn-sm" id="nav-logout-btn">Logout</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content" id="main-content">
+
+        <!-- ================= 1. LANDING PAGE VIEW ================= -->
+        <section id="view-landing" class="view-section active">
+            <div class="hero-container">
+                <div class="hero-badge">Built for College Students in India</div>
+                <h1 class="hero-title">Master your pocket money.<br><em>Zero math required.</em></h1>
+                <p class="hero-subtitle">
+                    From canteen chai & samosa to auto passes, practical files, and mobile recharges. Track every rupee
+                    without complex corporate finance software.
+                </p>
+                <div class="hero-cta-group">
+                    <button class="btn btn-primary btn-lg" id="landing-cta-signup">Start Tracking Free</button>
+                    <button class="btn btn-secondary btn-lg" id="landing-cta-demo">Try Demo Mode &rarr;</button>
+                </div>
+            </div>
+
+            <!-- HTML/CSS/SVG DASHBOARD PREVIEW ILLUSTRATION -->
+            <div class="hero-preview-wrapper">
+                <div class="hero-preview-card">
+                    <div class="preview-header">
+                        <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+                        <span class="preview-title">CampusSpend Monthly Overview</span>
+                    </div>
+                    <div class="preview-body">
+                        <div class="preview-stat-grid">
+                            <div class="p-stat">
+                                <span class="p-label">Monthly Pocket Money</span>
+                                <span class="p-val text-green">₹8,500</span>
+                            </div>
+                            <div class="p-stat">
+                                <span class="p-label">Total Spent</span>
+                                <span class="p-val text-coral">₹3,420</span>
+                            </div>
+                            <div class="p-stat">
+                                <span class="p-label">Daily Safe Allowance</span>
+                                <span class="p-val">₹254 / day</span>
+                            </div>
+                        </div>
+                        <div class="preview-chart-mock">
+                            <div class="mock-bar-group">
+                                <div class="mock-bar" style="height: 40%"></div><span>Canteen</span>
+                            </div>
+                            <div class="mock-bar-group">
+                                <div class="mock-bar" style="height: 70%"></div><span>Transport</span>
+                            </div>
+                            <div class="mock-bar-group">
+                                <div class="mock-bar" style="height: 30%"></div><span>Stationery</span>
+                            </div>
+                            <div class="mock-bar-group">
+                                <div class="mock-bar" style="height: 85%"></div><span>Recharge</span>
+                            </div>
+                            <div class="mock-bar-group">
+                                <div class="mock-bar" style="height: 25%"></div><span>Hostel</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- FEATURES GRID -->
+            <div class="features-section">
+                <h2 class="section-title">Designed around actual campus life</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="f-icon">☕</div>
+                        <h3>Canteen & Snacks</h3>
+                        <p>Log 20-rupee chai, 15-rupee samosa, or lab break quick bites with single-tap quick entry
+                            chips.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="f-icon">🚌</div>
+                        <h3>Bus, Auto & Metro</h3>
+                        <p>Keep your daily transit expenses under control—whether it's the college shuttle or shared
+                            auto rides.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="f-icon">📚</div>
+                        <h3>Practical & Printouts</h3>
+                        <p>Track last-minute assignment printouts, lab record books, photocopies, and semester
+                            textbooks.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="f-icon">🎯</div>
+                        <h3>Pocket Money Budgets</h3>
+                        <p>Receive smart visual alerts at 75% and 90% budget limits before your monthly allowance dries
+                            up.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HOW IT WORKS -->
+            <div class="how-section">
+                <h2 class="section-title">How CampusSpend Keeps You Solvent</h2>
+                <div class="steps-grid">
+                    <div class="step-card">
+                        <span class="step-num">01</span>
+                        <h4>Set Pocket Allowance</h4>
+                        <p>Record money sent by family, stipends, or opening cash balance at the start of the month.</p>
+                    </div>
+                    <div class="step-card">
+                        <span class="step-num">02</span>
+                        <h4>Quick Log On-the-Go</h4>
+                        <p>Tap prefilled chips for frequent expenses right after stepping out of the canteen or auto.
+                        </p>
+                    </div>
+                    <div class="step-card">
+                        <span class="step-num">03</span>
+                        <h4>Know Daily Spending Limit</h4>
+                        <p>Our formula recalculates how much you can spend per day to make your pocket money last all
+                            month.</p>
+                    </div>
+                </div>
+            </div>
+
+            <footer class="landing-footer">
+                <p>&copy; 2026 CampusSpend. Privacy-first, local-storage powered financial tool for students.</p>
+            </footer>
+        </section>
+
+        <!-- ================= 2. AUTHENTICATION VIEW ================= -->
+        <section id="view-auth" class="view-section">
+            <div class="auth-wrapper">
+                <div class="auth-card">
+                    <!-- LOGIN FORM -->
+                    <div id="auth-login-container">
+                        <h2 class="auth-title">Welcome Back</h2>
+                        <p class="auth-subtitle">Sign in to manage your campus expenses</p>
+                        <form id="form-login" novalidate>
+                            <div class="form-group">
+                                <label for="login-email">Email Address</label>
+                                <input type="email" id="login-email" placeholder="student@college.edu" required>
+                                <div class="field-error" id="err-login-email"></div>
+                            </div>
+                            <div class="form-group">
+                                <label for="login-password">Password</label>
+                                <div class="password-input-wrap">
+                                    <input type="password" id="login-password" placeholder="••••••••" required>
+                                    <button type="button" class="toggle-pwd" data-target="login-password">Show</button>
+                                </div>
+                                <div class="field-error" id="err-login-password"></div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-full">Sign In</button>
+                        </form>
+                        <div class="auth-divider"><span>OR</span></div>
+                        <button type="button" class="btn btn-outline btn-full" id="btn-demo-login">
+                            ⚡ Explore in Instant Demo Mode
+                        </button>
+                        <p class="auth-switch">
+                            Don't have a profile yet? <a href="#" id="link-to-signup">Create Profile</a>
+                        </p>
+                    </div>
+
+                    <!-- SIGNUP FORM -->
+                    <div id="auth-signup-container" class="hidden">
+                        <h2 class="auth-title">Create Profile</h2>
+                        <p class="auth-subtitle">Start tracking your pocket money today</p>
+                        <form id="form-signup" novalidate>
+                            <div class="form-group">
+                                <label for="signup-name">Full Name</label>
+                                <input type="text" id="signup-name" placeholder="e.g. Aarav Sharma" required>
+                                <div class="field-error" id="err-signup-name"></div>
+                            </div>
+                            <div class="form-group">
+                                <label for="signup-email">Email Address</label>
+                                <input type="email" id="signup-email" placeholder="student@college.edu" required>
+                                <div class="field-error" id="err-signup-email"></div>
+                            </div>
+                            <div class="form-group">
+                                <label for="signup-password">Password</label>
+                                <div class="password-input-wrap">
+                                    <input type="password" id="signup-password" placeholder="At least 6 characters"
+                                        required>
+                                    <button type="button" class="toggle-pwd" data-target="signup-password">Show</button>
+                                </div>
+                                <div class="field-error" id="err-signup-password"></div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-full">Create Student Account</button>
+                        </form>
+                        <div class="auth-divider"><span>OR</span></div>
+                        <button type="button" class="btn btn-outline btn-full" id="btn-demo-signup">
+                            ⚡ Explore in Instant Demo Mode
+                        </button>
+                        <p class="auth-switch">
+                            Already have a profile? <a href="#" id="link-to-login">Sign In</a>
+                        </p>
+                    </div>
+
+                    <!-- Security note comment per prompt instructions -->
+                    <!--
+            SECURITY NOTICE: This application is a client-side frontend demo. Authentication states and user data 
+            are stored in browser localStorage. Passwords are validated locally and stored in cleartext for demo 
+            purposes. Do not use real passwords or real bank credentials in this application.
+          -->
+                    <div class="auth-disclaimer">
+                        <small>🔒 Privacy Notice: Data stored securely on your browser device via LocalStorage. No data
+                            is sent to external servers.</small>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= 3. OVERVIEW VIEW ================= -->
+        <section id="view-overview" class="view-section">
+            <div class="dashboard-header">
+                <div>
+                    <h1 class="page-title">Financial Summary</h1>
+                    <p class="page-subtitle" id="overview-greeting">Welcome back to CampusSpend</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" id="btn-quick-add-income">+ Receive Pocket Money</button>
+                    <button class="btn btn-secondary" id="btn-quick-add-expense">- Add Expense</button>
+                </div>
+            </div>
+
+            <!-- MAIN BALANCE HERO BANNER -->
+            <div class="balance-banner-card">
+                <div class="balance-main">
+                    <span class="balance-label">Current Available Balance</span>
+                    <h2 class="balance-amount" id="val-net-balance">₹0.00</h2>
+                    <div class="balance-subtext" id="val-opening-info">Opening balance: ₹0.00</div>
+                </div>
+                <div class="balance-metrics">
+                    <div class="metric-item">
+                        <span class="metric-label">Pocket Money Received</span>
+                        <span class="metric-val text-green" id="val-total-income">₹0.00</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Expenses This Month</span>
+                        <span class="metric-val text-coral" id="val-total-expense">₹0.00</span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Safe Daily Allowance</span>
+                        <span class="metric-val" id="val-daily-allowance">₹0.00 / day</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SMART INSIGHTS CARD -->
+            <div class="insights-card" id="smart-insights-container">
+                <div class="insights-icon">💡</div>
+                <div class="insights-content">
+                    <h4>Campus Spend Insight</h4>
+                    <p id="smart-insight-text">Loading insights based on your spending activity...</p>
+                </div>
+            </div>
+
+            <!-- OVERVIEW TWO-COLUMN GRID -->
+            <div class="dashboard-grid">
+                <!-- LEFT COLUMN: CHARTS & TODAY -->
+                <div class="grid-col main-col">
+                    <div class="content-card">
+                        <div class="card-header">
+                            <h3>Monthly Income vs Expenses</h3>
+                        </div>
+                        <div class="chart-container" id="overview-bar-chart">
+                            <!-- SVG / CSS Bar chart rendered via JS -->
+                        </div>
+                    </div>
+
+                    <div class="content-card">
+                        <div class="card-header">
+                            <h3>Today's Campus Spending</h3>
+                            <span class="badge" id="today-total-badge">₹0.00 today</span>
+                        </div>
+                        <div id="today-tx-list" class="mini-tx-list">
+                            <!-- Rendered via JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT COLUMN: CATEGORY BREAKDOWN & BUDGET PROGRESS -->
+                <div class="grid-col side-col">
+                    <div class="content-card">
+                        <div class="card-header">
+                            <h3>Category Breakdown</h3>
+                        </div>
+                        <div class="chart-container-donut" id="overview-donut-chart">
+                            <!-- SVG Donut chart rendered via JS -->
+                        </div>
+                        <div id="overview-donut-legend" class="donut-legend"></div>
+                    </div>
+
+                    <div class="content-card">
+                        <div class="card-header">
+                            <h3>Budget Health</h3>
+                            <button class="btn-link" id="link-manage-budgets">Manage</button>
+                        </div>
+                        <div id="overview-budget-bars" class="budget-bars-list">
+                            <!-- Rendered via JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= 4. COLLEGE EXPENSES (QUICK LOG) ================= -->
+        <section id="view-expenses" class="view-section">
+            <div class="dashboard-header">
+                <div>
+                    <h1 class="page-title">Quick College Expense Entry</h1>
+                    <p class="page-subtitle">Tap a preset chip to quickly log everyday campus costs</p>
+                </div>
+            </div>
+
+            <div class="quick-chips-section">
+                <h3 class="section-subtitle">Frequent Campus Chips</h3>
+                <div class="chips-grid">
+                    <button class="chip-btn" data-cat="Canteen & Food" data-title="Canteen Tea & Samosa"
+                        data-amount="35">
+                        <span class="chip-icon">☕</span>
+                        <span class="chip-title">Chai & Samosa</span>
+                        <span class="chip-val">₹35</span>
+                    </button>
+                    <button class="chip-btn" data-cat="Canteen & Food" data-title="Canteen Lunch / Thali"
+                        data-amount="80">
+                        <span class="chip-icon">🍱</span>
+                        <span class="chip-title">Canteen Lunch</span>
+                        <span class="chip-val">₹80</span>
+                    </button>
+                    <button class="chip-btn" data-cat="Transport" data-title="Auto / E-Rickshaw Fare" data-amount="30">
+                        <span class="chip-icon">🛺</span>
+                        <span class="chip-title">Shared Auto</span>
+                        <span class="chip-val">₹30</span>
+                    </button>
+                    <button class="chip-btn" data-cat="Transport" data-title="College Bus Daily Ticket"
+                        data-amount="50">
+                        <span class="chip-icon">🚌</span>
+                        <span class="chip-title">Bus Ticket</span>
+                        <span class="chip-val">₹50</span>
+                    </button>
+                    <button class="chip-btn" data-cat="Study & Stationery" data-title="Lab File & Practical Sheet"
+                        data-amount="60">
+                        <span class="chip-icon">📝</span>
+                        <span class="chip-title">Practical Record</span>
+                        <span class="chip-val">₹60</span>
+                    </button>
+                    <button class="chip-btn" data-cat="Study & Stationery" data-title="Assignment Photocopy & Print"
+                        data-amount="20">
+                        <span class="chip-icon">🖨️</span>
+                        <span class="chip-title">Xerox / Printouts</span>
+                        <span class="chip-val">₹20</span>
+                    </button>
+                    <button class="chip-btn" data-cat="Mobile & Internet" data-title="Monthly Phone Recharge"
+                        data-amount="299">
+                        <span class="chip-icon">📱</span>
+                        <span class="chip-title">Mobile Recharge</span>
+                        <span class="chip-val">₹299</span>
+                    </button>
+                    <button class="chip-btn" data-cat="Personal" data-title="Gym / Hostel Snacks" data-amount="120">
+                        <span class="chip-icon">🏋️</span>
+                        <span class="chip-title">Personal / Snacks</span>
+                        <span class="chip-val">₹120</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="grid-col main-col">
+                    <div class="content-card">
+                        <h3>College Expense Summary</h3>
+                        <div class="college-stats-grid">
+                            <div class="c-stat-box">
+                                <span class="c-label">Today's Total</span>
+                                <span class="c-val" id="college-stat-today">₹0.00</span>
+                            </div>
+                            <div class="c-stat-box">
+                                <span class="c-label">This Week</span>
+                                <span class="c-val" id="college-stat-week">₹0.00</span>
+                            </div>
+                            <div class="c-stat-box">
+                                <span class="c-label">This Month</span>
+                                <span class="c-val" id="college-stat-month">₹0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid-col side-col">
+                    <div class="content-card">
+                        <h3>Campus Category Totals</h3>
+                        <div id="college-category-breakdown-list" class="category-list-wrap"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= 5. TRANSACTIONS LEDGER VIEW ================= -->
+        <section id="view-transactions" class="view-section">
+            <div class="dashboard-header">
+                <div>
+                    <h1 class="page-title">Transaction Ledger</h1>
+                    <p class="page-subtitle">Full searchable log of all money received & spent</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" id="btn-ledger-add">+ Add Record</button>
+                </div>
+            </div>
+
+            <!-- FILTERS AND SEARCH BAR -->
+            <div class="filter-bar">
+                <div class="filter-item search-item">
+                    <input type="text" id="filter-search" placeholder="Search merchant, notes, category...">
+                </div>
+                <div class="filter-item">
+                    <select id="filter-type">
+                        <option value="all">All Types</option>
+                        <option value="expense">Expenses Only</option>
+                        <option value="income">Income Only</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <select id="filter-category">
+                        <option value="all">All Categories</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <select id="filter-sort">
+                        <option value="date-desc">Newest First</option>
+                        <option value="date-asc">Oldest First</option>
+                        <option value="amount-desc">Highest Amount</option>
+                        <option value="amount-asc">Lowest Amount</option>
+                    </select>
+                </div>
+                <div class="filter-item">
+                    <button class="btn btn-secondary" id="btn-reset-filters">Reset</button>
+                </div>
+            </div>
+
+            <!-- TRANSACTIONS TABLE / LIST -->
+            <div class="content-card padding-none">
+                <div class="table-responsive">
+                    <table class="data-table" id="tx-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Category</th>
+                                <th>Merchant / Details</th>
+                                <th>Payment</th>
+                                <th>Type</th>
+                                <th class="text-right">Amount</th>
+                                <th class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tx-table-body">
+                            <!-- Rendered dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="tx-empty-state" class="empty-state hidden">
+                    <p>No transactions found matching your filters.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= 6. BUDGETS VIEW ================= -->
+        <section id="view-budgets" class="view-section">
+            <div class="dashboard-header">
+                <div>
+                    <h1 class="page-title">Monthly Budgets</h1>
+                    <p class="page-subtitle">Set boundaries for your spending categories</p>
+                </div>
+            </div>
+
+            <div class="content-card mb-4">
+                <h3>Total Monthly Spending Limit</h3>
+                <div class="form-row align-end">
+                    <div class="form-group flex-1">
+                        <label for="budget-overall-input">Overall Target Budget (₹)</label>
+                        <input type="number" id="budget-overall-input" placeholder="e.g. 6000" min="0" step="any">
+                    </div>
+                    <button class="btn btn-primary" id="btn-save-overall-budget">Save Target</button>
+                </div>
+            </div>
+
+            <div class="content-card">
+                <h3>Category Budget Allocations</h3>
+                <p class="subtext mb-3">Define limits for specific expense categories. Leave as 0 for unbudgeted
+                    categories.</p>
+                <div id="category-budget-list" class="budget-setting-grid">
+                    <!-- Rendered via JS -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= 7. ANALYTICS VIEW ================= -->
+        <section id="view-analytics" class="view-section">
+            <div class="dashboard-header">
+                <div>
+                    <h1 class="page-title">Financial Analytics & Reports</h1>
+                    <p class="page-subtitle">Visual analysis of your campus cash flow</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" id="btn-print-report">🖨️ Print Summary Report</button>
+                    <button class="btn btn-secondary" id="btn-export-csv">📥 Export CSV</button>
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="grid-col main-col">
+                    <div class="content-card">
+                        <h3>Category Distribution Analysis</h3>
+                        <div id="analytics-donut-container" class="chart-container-large"></div>
+                    </div>
+                </div>
+
+                <div class="grid-col side-col">
+                    <div class="content-card">
+                        <h3>Data Management & Backups</h3>
+                        <p class="subtext mb-3">Export your data for backup or import a saved JSON file.</p>
+                        <div class="btn-stack">
+                            <button class="btn btn-outline" id="btn-export-json">Export JSON Backup</button>
+                            <label for="import-json-file" class="btn btn-outline text-center" style="cursor:pointer;">
+                                Import JSON Backup
+                            </label>
+                            <input type="file" id="import-json-file" accept=".json" class="hidden">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= 8. SAVINGS GOALS VIEW ================= -->
+        <section id="view-savings" class="view-section">
+            <div class="dashboard-header">
+                <div>
+                    <h1 class="page-title">Savings Goals</h1>
+                    <p class="page-subtitle">Save up for textbooks, gear, tech accessories, or emergency funds</p>
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-primary" id="btn-new-goal">+ New Goal</button>
+                </div>
+            </div>
+
+            <div id="savings-goals-grid" class="goals-grid">
+                <!-- Savings goals rendered via JS -->
+            </div>
+        </section>
+
+        <!-- ================= 9. CALENDAR VIEW ================= -->
+        <section id="view-calendar" class="view-section">
+            <div class="dashboard-header">
+                <div>
+                    <h1 class="page-title">Spending Calendar</h1>
+                    <p class="page-subtitle">Inspect daily spending pattern across the month</p>
+                </div>
+                <div class="calendar-controls">
+                    <button class="btn btn-secondary btn-sm" id="cal-prev">&larr; Prev</button>
+                    <span id="cal-month-year" class="calendar-title-text">Month 2026</span>
+                    <button class="btn btn-secondary btn-sm" id="cal-next">Next &rarr;</button>
+                </div>
+            </div>
+
+            <div class="content-card padding-none">
+                <div class="calendar-grid-header">
+                    <div>Sun</div>
+                    <div>Mon</div>
+                    <div>Tue</div>
+                    <div>Wed</div>
+                    <div>Thu</div>
+                    <div>Fri</div>
+                    <div>Sat</div>
+                </div>
+                <div id="calendar-days" class="calendar-grid-days"></div>
+            </div>
+
+            <div class="content-card mt-4" id="calendar-day-details">
+                <h3>Transactions for <span id="cal-selected-date-str">Selected Date</span></h3>
+                <div id="cal-day-tx-list" class="mini-tx-list mt-2">
+                    <p class="text-muted">Select a date in the calendar to view transactions.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= 10. SETTINGS VIEW ================= -->
+        <section id="view-settings" class="view-section">
+            <div class="dashboard-header">
+                <div>
+                    <h1 class="page-title">App Settings & Profile</h1>
+                    <p class="page-subtitle">Customize preferences, opening balance, and manage stored data</p>
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                <div class="grid-col main-col">
+                    <div class="content-card">
+                        <h3>Profile & Preferences</h3>
+                        <form id="form-settings-profile" class="mt-3">
+                            <div class="form-group">
+                                <label for="settings-name">Display Name</label>
+                                <input type="text" id="settings-name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="settings-opening-balance">Opening Balance / Carryover Cash (₹)</label>
+                                <input type="number" id="settings-opening-balance" step="any" min="0">
+                                <small class="subtext">This base amount will be added to your current balance
+                                    calculation.</small>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Save Changes</button>
+                        </form>
+                    </div>
+
+                    <div class="content-card mt-4">
+                        <h3>Manage Categories</h3>
+                        <div class="form-row mt-3 align-end">
+                            <div class="form-group flex-1">
+                                <label for="new-cat-name">Add Custom Category</label>
+                                <input type="text" id="new-cat-name" placeholder="e.g. Subscriptions, Gaming">
+                            </div>
+                            <button class="btn btn-secondary" id="btn-add-category">Add Category</button>
+                        </div>
+                        <div id="settings-categories-list" class="tag-cloud mt-3"></div>
+                    </div>
+                </div>
+
+                <div class="grid-col side-col">
+                    <div class="content-card border-danger">
+                        <h3 class="text-danger">Reset Application Data</h3>
+                        <p class="subtext mb-3">Clear all saved transactions, budgets, goals, and settings for this
+                            profile. This action cannot be undone.</p>
+                        <button class="btn btn-danger btn-full" id="btn-reset-data">Clear & Reset Profile Data</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MOBILE BOTTOM NAVIGATION (HIDDEN ON LANDING & AUTH) -->
+    <nav class="mobile-bottom-nav hidden" id="mobile-bottom-nav">
+        <button class="m-nav-link active" data-view="overview">
+            <svg class="m-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            </svg>
+            <span>Home</span>
+        </button>
+        <button class="m-nav-link" data-view="expenses">
+            <svg class="m-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="16" />
+                <line x1="8" y1="12" x2="16" y2="12" />
+            </svg>
+            <span>Quick Log</span>
+        </button>
+        <button class="m-nav-link" data-view="transactions">
+            <svg class="m-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="8" y1="6" x2="21" y2="6" />
+                <line x1="8" y1="12" x2="21" y2="12" />
+                <line x1="8" y1="18" x2="21" y2="18" />
+                <line x1="3" y1="6" x2="3.01" y2="6" />
+                <line x1="3" y1="12" x2="3.01" y2="12" />
+                <line x1="3" y1="18" x2="3.01" y2="18" />
+            </svg>
+            <span>Ledger</span>
+        </button>
+        <button class="m-nav-link" data-view="budgets">
+            <svg class="m-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="5" width="20" height="14" rx="2" />
+                <line x1="2" y1="10" x2="22" y2="10" />
+            </svg>
+            <span>Budgets</span>
+        </button>
+        <button class="m-nav-link" data-view="settings">
+            <svg class="m-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3" />
+                <path
+                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+            <span>Settings</span>
+        </button>
+    </nav>
+
+    <script src="script.js"></script>
+</body>
+
+</html>
